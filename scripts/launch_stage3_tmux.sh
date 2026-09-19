@@ -70,7 +70,7 @@ wait_workers() {
     local i=0
     for g in "${GPUS[@]}"; do
       local log="$ROOT/exp/logs/stage3-worker-gpu${g}-shard${i}-${mode}.log"
-      if [ ! -f "$log" ] || ! grep -q "worker GPU $g done" "$log"; then
+      if [ ! -f "$log" ] || ! grep -qE "worker GPU[= ]$g done" "$log"; then
         alive=1
       fi
       i=$((i + 1))
