@@ -82,6 +82,24 @@ def reduce_snapshot(snap):
     for i in range(snap["q_term"].shape[0]):
         row[f"Q_i{i:02d}_term_mean"] = float(np.mean(snap["q_term"][i]))
         row[f"g_i{i:02d}_term_norm_mean"] = float(np.mean(np.linalg.norm(snap["g_term"][i], axis=-1)))
+    for key in (
+        "F_signal_early",
+        "F_signal_middle",
+        "F_signal_late",
+        "F_signal_active",
+        "am_weight_sum",
+    ):
+        if key in snap:
+            row[key] = float(np.asarray(snap[key]).reshape(-1)[0])
+    if "am_w" in snap:
+        for k in range(T):
+            row[f"t{k:02d}/am_w"] = float(np.asarray(snap["am_w"]).reshape(-1)[k])
+    if "am_L_t" in snap:
+        for k in range(T):
+            row[f"t{k:02d}/am_L"] = float(np.asarray(snap["am_L_t"]).reshape(-1)[k])
+    if "am_wL_t" in snap:
+        for k in range(T):
+            row[f"t{k:02d}/am_wL"] = float(np.asarray(snap["am_wL_t"]).reshape(-1)[k])
     return row
 
 

@@ -1,0 +1,6 @@
+region,active_steps,F_signal
+early50,0-4,0.059009
+middle40,3-6,0.190902
+late50,5-9,0.940991
+late75,2-9,0.997099
+late25,7-9,0.798973
