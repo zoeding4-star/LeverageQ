@@ -3,7 +3,7 @@
 # Usage: bash launch_stage3_worker.sh <gpu> <shard_index> <n_shards> [smoke|full]
 set -euo pipefail
 
-GPU="${1:?gpu in {1,4,5}}"
+GPU="${1:?idle gpu index}"
 SHARD="${2:?shard index 0..n-1}"
 NSHARD="${3:-3}"
 MODE="${4:-full}"
@@ -13,11 +13,13 @@ LOGDIR="$ROOT/exp/logs"
 mkdir -p "$LOGDIR"
 MASTER_LOG="$LOGDIR/stage3-worker-gpu${GPU}-shard${SHARD}-${MODE}.log"
 
-ALLOWED="1 4 5"
-if ! echo " $ALLOWED " | grep -q " $GPU "; then
-  echo "GPU $GPU is not in the allowed idle set {$ALLOWED}. Refusing." >&2
-  exit 2
-fi
+case "$GPU" in
+  1|4|5) ;;
+  *)
+    echo "GPU $GPU is not in the allowed idle set 1,4,5. Refusing." >&2
+    exit 2
+    ;;
+esac
 
 cd "$ROOT"
 echo "[$(date -Is)] worker GPU=$GPU shard=$SHARD/$NSHARD mode=$MODE" | tee -a "$MASTER_LOG"
