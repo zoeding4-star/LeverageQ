@@ -97,7 +97,49 @@ class LoggingHelper:
     def log(self, data, prefix, step):
         assert prefix in self.csv_loggers, prefix
         self.csv_loggers[prefix].log(data, step=step)
-        self.wandb_logger.log({f'{prefix}/{k}': v for k, v in data.items()}, step=step)
+        payload = _wandb_scalar_payload(data, prefix)
+        if payload:
+            self.wandb_logger.log(payload, step=step)
+
+
+# MuJoCo dumps these as vectors; W&B then draws them as area/heatmap blocks.
+_WANDB_SKIP_SUBSTR = (
+    "qpos",
+    "qvel",
+    "control",
+    "button_states",
+    "prev_qpos",
+    "prev_qvel",
+)
+
+
+def _as_finite_scalar(value):
+    if hasattr(value, "ndim"):
+        arr = np.asarray(value)
+        if arr.size != 1:
+            return None
+        value = arr.reshape(-1)[0]
+    try:
+        number = float(value)
+    except (TypeError, ValueError):
+        return None
+    if not np.isfinite(number):
+        return None
+    return number
+
+
+def _wandb_scalar_payload(data, prefix):
+    """Keep W&B charts as 1-D scalars. Skip MuJoCo state vectors."""
+    out = {}
+    for key, value in data.items():
+        lowered = str(key).lower()
+        if any(token in lowered for token in _WANDB_SKIP_SUBSTR):
+            continue
+        number = _as_finite_scalar(value)
+        if number is None:
+            continue
+        out[f"{prefix}/{key}"] = number
+    return out
 
 
 def _single_batch(batch):
