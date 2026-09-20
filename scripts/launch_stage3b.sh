@@ -1,27 +1,18 @@
 #!/usr/bin/env bash
-# One Stage-3 flow-region run on a currently idle GPU.
-# Usage: bash launch_stage3.sh <idle_gpu> <mask> <seed> [smoke|full] [natural|norm]
+# One Stage-3B floor+boost run on a currently idle GPU.
+# Usage: bash launch_stage3b.sh <idle_gpu> <mask> <seed> [smoke|full]
 set -euo pipefail
 
 GPU="${1:?idle gpu index}"
-MASK="${2:?am_mask_name, e.g. late50}"
+MASK="${2:?am_mask_name, e.g. late_b1}"
 SEED="${3:?seed}"
 MODE="${4:-full}"
-BUDGET="${5:-natural}"
 ROOT=/mnt/zoe/projects/qam
 PY=/mnt/zoe/conda-envs/qam/bin/python
 LOGDIR="$ROOT/exp/logs"
 mkdir -p "$LOGDIR"
 SAFE_MASK="${MASK//_/-}"
-LOG="$LOGDIR/stage3-${SAFE_MASK}-s${SEED}-gpu${GPU}-${MODE}-${BUDGET}.log"
-
-if [ "$BUDGET" = "norm" ] || [ "$BUDGET" = "equal" ]; then
-  NORM=True
-  GROUP_SUFFIX="-norm"
-else
-  NORM=False
-  GROUP_SUFFIX=""
-fi
+LOG="$LOGDIR/stage3b-${SAFE_MASK}-s${SEED}-gpu${GPU}-${MODE}.log"
 
 export GPU
 export HOME=/mnt/zoe/home
@@ -36,26 +27,30 @@ export PYTHONPATH="$ROOT${PYTHONPATH:+:$PYTHONPATH}"
 
 cd "$ROOT"
 
+# Paper QAM on cube-double (Table 4 + Table 5 + reproduce.py):
+# inv_temp=1, fql_alpha=0, edit_scale=0, h=5 chunking, K=10, rho=0.5, T=10,
+# 1M offline + 500k online. Task 4 is the second official tuning task.
 COMMON=(
   "$PY" main_stage3.py
   --agent=agents/qam_region.py
-  --env_name=cube-double-play-singletask-task2-v0
+  --env_name=cube-double-play-singletask-task4-v0
   --sparse=False
   --horizon_length=5
   --agent.action_chunking=True
   --agent.inv_temp=1.0
   --agent.fql_alpha=0.0
   --agent.edit_scale=0.0
+  --agent.num_qs=10
+  --agent.rho=0.5
+  --agent.flow_steps=10
+  --agent.clip_grad=True
   --agent.am_mask_name="$MASK"
-  --agent.am_budget_normalize="$NORM"
+  --agent.am_budget_normalize=False
   --seed="$SEED"
 )
 
-echo "[$(date -Is)] STAGE3 GPU=$GPU mask=$MASK seed=$SEED mode=$MODE budget=$BUDGET entity=$WANDB_ENTITY" | tee -a "$LOG"
+echo "[$(date -Is)] STAGE3B GPU=$GPU mask=$MASK seed=$SEED mode=$MODE env=c2-task4 inv_temp=1 entity=$WANDB_ENTITY" | tee -a "$LOG"
 
-# Default: 1 seed per mask (10001). Extra seeds only if STAGE3_ALL_SEEDS=1.
-# Live tmux workers re-exec this script for each queued job, so this also
-# stops already-started 3-seed queues without killing the current training.
 ALLOWED_SEEDS="${STAGE3_SEEDS:-10001}"
 seed_ok=0
 for s in $ALLOWED_SEEDS; do
@@ -71,15 +66,15 @@ fi
 
 if [ "$MODE" = "smoke" ]; then
   bash "$ROOT/scripts/run_on_idle_gpu.sh" "${COMMON[@]}" \
-    --run_group="stage3-region-smoke${GROUP_SUFFIX}" \
-    --tags="STAGE3,${MASK},smoke,cube-double" \
+    --run_group=stage3b-floor-boost-smoke \
+    --tags="STAGE3B,${MASK},smoke,cube-double-task4" \
     --offline_steps=200 \
     --online_steps=0 \
     --eval_interval=200 \
     --eval_episodes=2 \
     --log_interval=50 \
-    --dump_interval=50 \
-    --dump_samples=16 \
+    --diag_interval=0 \
+    --dump_interval=0 \
     --save_interval=0 \
     2>&1 | tee -a "$LOG"
   exit ${PIPESTATUS[0]}
@@ -91,8 +86,8 @@ if [ "$MODE" != "full" ]; then
 fi
 
 bash "$ROOT/scripts/run_on_idle_gpu.sh" "${COMMON[@]}" \
-  --run_group="stage3-region${GROUP_SUFFIX}" \
-  --tags="STAGE3,${MASK},cube-double,screening" \
+  --run_group=stage3b-floor-boost \
+  --tags="STAGE3B,${MASK},cube-double-task4,screening" \
   --offline_steps=1000000 \
   --online_steps=500000 \
   --eval_interval=50000 \

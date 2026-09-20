@@ -13,9 +13,14 @@ if ROOT not in sys.path:
     sys.path.insert(0, ROOT)
 
 from stage3.am_weights import (
+    STAGE3B_FLOOR,
+    STAGE3B_PEAK_025,
+    STAGE3B_PEAK_1,
+    STAGE3B_ROUND,
     compute_am_weights,
     describe_am_mask,
     f_signal,
+    floor_boost_weights,
     normalized_flow_times,
     region_masks,
 )
@@ -119,6 +124,62 @@ def test_describe():
     assert d["active_steps"] == [7, 8, 9]
 
 
+def test_stage3b_never_zero_except_noq():
+    for name in STAGE3B_ROUND:
+        w = compute_am_weights(name)
+        if name == "noq":
+            _assert_close(w, np.zeros(10), msg=name)
+        else:
+            assert np.all(w > 0), name
+            assert float(w.min()) >= STAGE3B_FLOOR - 1e-12, (name, w.min())
+
+
+def test_const05():
+    _assert_close(compute_am_weights("const05"), np.full(10, 0.5))
+    _assert_close(compute_am_weights("half"), np.full(10, 0.5))
+
+
+def test_floor_boost_b1():
+    t = normalized_flow_times(10)
+    w = compute_am_weights("early_b1")
+    _assert_close(w[t < 0.5], STAGE3B_PEAK_1)
+    _assert_close(w[t >= 0.5], STAGE3B_FLOOR)
+    w = compute_am_weights("late_b1")
+    _assert_close(w[t >= 0.5], STAGE3B_PEAK_1)
+    _assert_close(w[t < 0.5], STAGE3B_FLOOR)
+    w = compute_am_weights("middle_b1")
+    mid = (t >= 0.3) & (t < 0.7)
+    _assert_close(w[mid], STAGE3B_PEAK_1)
+    _assert_close(w[~mid], STAGE3B_FLOOR)
+
+
+def test_floor_boost_plus025():
+    t = normalized_flow_times(10)
+    w = compute_am_weights("late_b025")
+    _assert_close(w[t >= 0.5], STAGE3B_PEAK_025)
+    _assert_close(w[t < 0.5], STAGE3B_FLOOR)
+    assert abs(STAGE3B_PEAK_025 - 0.5) < 1e-12
+
+
+def test_ramps():
+    inc = compute_am_weights("increasing")
+    dec = compute_am_weights("decreasing")
+    assert np.all(np.diff(inc) > 0)
+    assert np.all(np.diff(dec) < 0)
+    assert abs(inc[0] - STAGE3B_FLOOR) < 1e-12
+    assert abs(inc[-1] - STAGE3B_PEAK_1) < 1e-12
+    _assert_close(inc[::-1], dec)
+    assert np.all(inc > 0) and np.all(dec > 0)
+
+
+def test_floor_helper_rejects_zero_floor():
+    try:
+        floor_boost_weights("late", floor=0.0, peak=1.0)
+    except ValueError:
+        return
+    raise AssertionError("zero floor should be rejected")
+
+
 if __name__ == "__main__":
     tests = [v for k, v in list(globals().items()) if k.startswith("test_") and callable(v)]
     for fn in tests:
@@ -128,3 +189,6 @@ if __name__ == "__main__":
     for name in ("noq", "all", "early50", "middle40", "late50", "late75", "late25", "early_heavy", "late_heavy"):
         print(describe_am_mask(name)["summary"])
     print("late50_norm", describe_am_mask("late50", budget_normalize=True)["summary"])
+    print("---- stage3b ----")
+    for name in STAGE3B_ROUND:
+        print(describe_am_mask(name)["summary"])

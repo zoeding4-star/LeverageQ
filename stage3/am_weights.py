@@ -14,6 +14,11 @@ T / sum(w) so sum_k w'_k = T.
 
 Smooth schedules (early-heavy / late-heavy / quad-late-heavy) are always
 scaled to mean(w)=1, i.e. the same total Q-guidance budget as All.
+
+Stage 3B floor+boost (never zero except No-Q):
+
+    floor = 0.25,   peak_1 = 1.0,   peak_+0.25 = 0.50
+    increasing: affine floor -> 1,  decreasing: affine 1 -> floor
 """
 
 from __future__ import annotations
@@ -72,7 +77,51 @@ ALIASES = {
     "m8": "late_heavy",
     "quad_late": "quad_late_heavy",
     "m9": "quad_late_heavy",
+    "const_half": "const05",
+    "const_0.5": "const05",
+    "constant05": "const05",
+    "half": "const05",
+    "early_boost1": "early_b1",
+    "middle_boost1": "middle_b1",
+    "late_boost1": "late_b1",
+    "early_boost025": "early_b025",
+    "middle_boost025": "middle_b025",
+    "late_boost025": "late_b025",
+    "early_plus025": "early_b025",
+    "inc": "increasing",
+    "dec": "decreasing",
 }
+
+# Stage 3B: weak non-zero floor + region boost. Not equal-budget.
+STAGE3B_FLOOR = 0.25
+STAGE3B_PEAK_1 = 1.0
+STAGE3B_PEAK_025 = STAGE3B_FLOOR + 0.25  # additive +0.25 boost -> 0.50
+STAGE3B_IDS = {
+    "noq": "B0",
+    "all": "B1",
+    "const05": "B2",
+    "early_b1": "B3",
+    "middle_b1": "B4",
+    "late_b1": "B5",
+    "early_b025": "B6",
+    "middle_b025": "B7",
+    "late_b025": "B8",
+    "increasing": "B9",
+    "decreasing": "B10",
+}
+STAGE3B_ROUND = (
+    "noq",
+    "all",
+    "const05",
+    "late_b1",
+    "early_b1",
+    "middle_b1",
+    "late_b025",
+    "early_b025",
+    "middle_b025",
+    "increasing",
+    "decreasing",
+)
 
 
 def _as_bool(value) -> bool:
@@ -103,6 +152,53 @@ def normalized_flow_times(flow_steps: int) -> np.ndarray:
 
 def _hard_from_predicate(t: np.ndarray, pred) -> np.ndarray:
     return pred(t).astype(np.float64)
+
+
+def _region_bool(t: np.ndarray, region: str) -> np.ndarray:
+    if region == "early":
+        return t < 0.5
+    if region == "middle":
+        return (t >= 0.3) & (t < 0.7)
+    if region == "late":
+        return t >= 0.5
+    raise ValueError(f"unknown region {region!r}")
+
+
+def floor_boost_weights(
+    region: str,
+    flow_steps: int = 10,
+    floor: float = STAGE3B_FLOOR,
+    peak: float = STAGE3B_PEAK_1,
+) -> np.ndarray:
+    """w = floor everywhere, peak on the named region. min(w)=floor > 0."""
+    t = normalized_flow_times(flow_steps)
+    floor = float(floor)
+    peak = float(peak)
+    if floor <= 0.0:
+        raise ValueError(f"floor must be > 0, got {floor}")
+    w = np.full(t.shape, floor, dtype=np.float64)
+    w[_region_bool(t, region)] = peak
+    return w
+
+
+def ramp_weights(
+    flow_steps: int = 10,
+    lo: float = STAGE3B_FLOOR,
+    hi: float = STAGE3B_PEAK_1,
+    decreasing: bool = False,
+) -> np.ndarray:
+    """Affine in t_k from lo to hi (or hi to lo). Endpoints stay > 0."""
+    t = normalized_flow_times(flow_steps)
+    lo = float(lo)
+    hi = float(hi)
+    if min(lo, hi) <= 0.0:
+        raise ValueError(f"ramp endpoints must be > 0, got lo={lo} hi={hi}")
+    if t.size == 1:
+        return np.array([hi if decreasing else lo], dtype=np.float64)
+    u = t / t[-1]
+    if decreasing:
+        return hi + (lo - hi) * u
+    return lo + (hi - lo) * u
 
 
 def compute_am_weights(
@@ -147,10 +243,27 @@ def compute_am_weights(
     elif name == "quad_late_heavy":
         w = (t + eps) ** 2
         w = w / w.mean()
+    elif name in ("const05", "const_half"):
+        w = np.full(T, 0.5, dtype=np.float64)
+    elif name == "early_b1":
+        w = floor_boost_weights("early", T, STAGE3B_FLOOR, STAGE3B_PEAK_1)
+    elif name == "middle_b1":
+        w = floor_boost_weights("middle", T, STAGE3B_FLOOR, STAGE3B_PEAK_1)
+    elif name == "late_b1":
+        w = floor_boost_weights("late", T, STAGE3B_FLOOR, STAGE3B_PEAK_1)
+    elif name == "early_b025":
+        w = floor_boost_weights("early", T, STAGE3B_FLOOR, STAGE3B_PEAK_025)
+    elif name == "middle_b025":
+        w = floor_boost_weights("middle", T, STAGE3B_FLOOR, STAGE3B_PEAK_025)
+    elif name == "late_b025":
+        w = floor_boost_weights("late", T, STAGE3B_FLOOR, STAGE3B_PEAK_025)
+    elif name == "increasing":
+        w = ramp_weights(T, STAGE3B_FLOOR, STAGE3B_PEAK_1, decreasing=False)
+    elif name == "decreasing":
+        w = ramp_weights(T, STAGE3B_FLOOR, STAGE3B_PEAK_1, decreasing=True)
     else:
-        raise ValueError(
-            f"Unknown am_mask_name={name!r}. Known: {sorted(set(list(_T10) + list(MASK_IDS)))}"
-        )
+        known = sorted(set(list(_T10) + list(MASK_IDS) + list(STAGE3B_IDS)))
+        raise ValueError(f"Unknown am_mask_name={name!r}. Known: {known}")
 
     if budget_normalize and float(w.sum()) > 0.0:
         w = w * (T / float(w.sum()))
@@ -196,7 +309,7 @@ def describe_am_mask(
         active_steps = np.nonzero(active)[0].tolist()
     else:
         t_lo, t_hi, active_steps = 0.0, 0.0, []
-    mid = MASK_IDS.get(name, name)
+    mid = MASK_IDS.get(name, STAGE3B_IDS.get(name, name))
     if budget_normalize and name in ("early50", "late50"):
         mid = MASK_IDS.get(f"{name}_norm", mid)
     weights = tuple(float(x) for x in w)

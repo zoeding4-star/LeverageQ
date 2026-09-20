@@ -37,6 +37,16 @@ flags.DEFINE_integer('eval_interval', 50000, 'Evaluation interval.')
 flags.DEFINE_integer('save_interval', 50000, 'Save interval.') # for the offline stage only.
 flags.DEFINE_integer('dump_interval', 10000, 'How often to dump raw diag npz snapshots.')
 flags.DEFINE_integer('dump_samples', 64, 'Samples per diag npz dump (subsampled from the batch).')
+flags.DEFINE_integer(
+    'diag_interval',
+    -1,
+    'How often to run diagnostic_snapshot. -1 = log_interval (Stage 2 default). 0 = off.',
+)
+flags.DEFINE_integer(
+    'env_log_interval',
+    1,
+    'Online env csv/W&B interval. Official default is every step (1).',
+)
 flags.DEFINE_integer('start_training', 5000, 'when does training start')
 
 flags.DEFINE_integer('utd_ratio', 1, "update to data ratio")
@@ -90,7 +100,8 @@ def _single_batch(batch):
 
 def maybe_log_diagnostics(agent, batch, step, save_dir, logger, seed):
     """Record raw flow-time signals. Does not change the training update."""
-    need_log = step % FLAGS.log_interval == 0
+    diag_every = FLAGS.log_interval if FLAGS.diag_interval < 0 else FLAGS.diag_interval
+    need_log = diag_every > 0 and step % diag_every == 0
     need_dump = FLAGS.dump_interval > 0 and step % FLAGS.dump_interval == 0
     if not (need_log or need_dump):
         return
@@ -362,8 +373,8 @@ def main(_):
         for key, value in info.items():
             if key.startswith("distance"): # for cubes
                 env_info[key] = value
-        # always log this at every step
-        logger.log(env_info, "env", step=log_step)
+        if FLAGS.env_log_interval > 0 and i % FLAGS.env_log_interval == 0:
+            logger.log(env_info, "env", step=log_step)
 
         if FLAGS.sparse:
             assert int_reward <= 0.0

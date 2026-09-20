@@ -102,9 +102,8 @@ Late-only 即使 step 少，也可能保留绝大多数一阶 AM signal。因此
 
 ## Seeds
 
-- Debug：每 mask 1 seed（10001），smoke 200 steps 确认无 NaN、weight 正确、loss 有限  
-- Screening：3 seeds `10001/20002/30003`，9 configs × 3 = 27 full runs  
-- Final 5–8 seeds：只对真正有差异的方法再加，现在不加
+当前默认 **每种假设 1 个 seed（10001）= 9 个 full run**。  
+要加 20002/30003 时再设 `STAGE3_ALL_SEEDS=1`。有差异的方法才做 3–8 seed。
 
 ## 怎么跑 / 怎么看
 
@@ -114,7 +113,7 @@ Late-only 即使 step 少，也可能保留绝大多数一阶 AM signal。因此
 # CPU 单测
 /mnt/zoe/conda-envs/qam/bin/python stage3/test_am_weights.py
 
-# 在 tmux 里：先 9 个 smoke，通过后再 27 个 full
+# 在 tmux 里：9 个 smoke，再 9 个 full（每 mask 1 seed）
 bash /mnt/zoe/projects/qam/scripts/launch_stage3_tmux.sh all
 
 tmux attach -t qam-s3-master

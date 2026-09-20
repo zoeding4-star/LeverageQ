@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
-# Sequential Stage-3 jobs on ONE allowed idle GPU. Refuses occupied cards.
-# Usage: bash launch_stage3_worker.sh <gpu> <shard_index> <n_shards> [smoke|full]
+# Sequential Stage-3B jobs on ONE allowed idle GPU. Refuses occupied cards.
+# Usage: bash launch_stage3b_worker.sh <gpu> <shard_index> <n_shards> [smoke|full]
 set -euo pipefail
 
 GPU="${1:?idle gpu index}"
@@ -11,7 +11,7 @@ ROOT=/mnt/zoe/projects/qam
 PY=/mnt/zoe/conda-envs/qam/bin/python
 LOGDIR="$ROOT/exp/logs"
 mkdir -p "$LOGDIR"
-MASTER_LOG="$LOGDIR/stage3-worker-gpu${GPU}-shard${SHARD}-${MODE}.log"
+MASTER_LOG="$LOGDIR/stage3b-worker-gpu${GPU}-shard${SHARD}-${MODE}.log"
 
 case "$GPU" in
   1|4|5) ;;
@@ -22,10 +22,9 @@ case "$GPU" in
 esac
 
 cd "$ROOT"
-echo "[$(date -Is)] worker GPU=$GPU shard=$SHARD/$NSHARD mode=$MODE" | tee -a "$MASTER_LOG"
+echo "[$(date -Is)] stage3b worker GPU=$GPU shard=$SHARD/$NSHARD mode=$MODE" | tee -a "$MASTER_LOG"
 
-JOB_ARGS=(--shard "$SHARD" --n-shards "$NSHARD")
-# 9 masks x 1 seed unless STAGE3_ALL_SEEDS=1 (3-seed screening).
+JOB_ARGS=(--round stage3b --shard "$SHARD" --n-shards "$NSHARD")
 if [ "$MODE" = "smoke" ] || [ "${STAGE3_ALL_SEEDS:-0}" != "1" ]; then
   JOB_ARGS+=(--debug-only)
 fi
@@ -38,10 +37,9 @@ for job in "${JOBS[@]}"; do
   set -- $job
   MASK="$1"
   SEED="$2"
-  BUDGET="$3"
-  echo "[$(date -Is)] START mask=$MASK seed=$SEED budget=$BUDGET on GPU $GPU" | tee -a "$MASTER_LOG"
+  echo "[$(date -Is)] START mask=$MASK seed=$SEED on GPU $GPU" | tee -a "$MASTER_LOG"
   bash "$ROOT/scripts/wait_idle_gpu.sh" "$GPU" 30 | tee -a "$MASTER_LOG"
-  if bash "$ROOT/scripts/launch_stage3.sh" "$GPU" "$MASK" "$SEED" "$MODE" "$BUDGET"; then
+  if bash "$ROOT/scripts/launch_stage3b.sh" "$GPU" "$MASK" "$SEED" "$MODE"; then
     echo "[$(date -Is)] OK mask=$MASK seed=$SEED" | tee -a "$MASTER_LOG"
   else
     echo "[$(date -Is)] FAIL mask=$MASK seed=$SEED (exit $?). Continuing remaining jobs." | tee -a "$MASTER_LOG"
