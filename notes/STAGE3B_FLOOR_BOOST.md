@@ -3,7 +3,9 @@
 日期：2026-09-20  
 分支：`stage3b-floor-boost-c2t4`（从 `stage3-flow-region-ablation` 分出）  
 **不改** `agents/qam.py` / `main.py`。旧 Stage 3 结果和脚本保留。  
-W&B：entity `nightingale-314-`，project `qam-reproduce`，group `stage3b-floor-boost`
+W&B：独立项目 [`qam-stage3b`](https://wandb.ai/nightingale-314-/qam-stage3b)（不和以前的 `qam-reproduce` 混在一起）。  
+group：`smoke` / `full` 分开排。  
+run 名：`c2t4-<mask>-s<seed>-smoke|full`，例如 `c2t4-late_b1-s10001-full`。
 
 ## 为什么换任务 / 为什么用这篇论文的配置
 

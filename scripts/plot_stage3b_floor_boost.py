@@ -91,7 +91,7 @@ def _load_eval_runs(exp_root):
         seed = flags.get("seed")
         group = flags.get("run_group", "")
         env = flags.get("env_name", "")
-        if "stage3b-floor-boost" not in str(group):
+        if str(group) not in ("full", "stage3b-floor-boost"):
             continue
         if "smoke" in str(group):
             continue
@@ -155,7 +155,7 @@ def plot_success(runs, out_dir):
 def main():
     p = argparse.ArgumentParser()
     p.add_argument("--out", default=DEFAULT_OUT)
-    p.add_argument("--exp-root", default=os.path.join(ROOT, "exp/qam-reproduce"))
+    p.add_argument("--exp-root", default=os.path.join(ROOT, "exp/qam-stage3b"))
     args = p.parse_args()
     os.makedirs(args.out, exist_ok=True)
     plot_weights(args.out)

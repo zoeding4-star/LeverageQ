@@ -22,8 +22,11 @@ export XLA_PYTHON_CLIENT_PREALLOCATE=false
 export PYTHONUNBUFFERED=1
 export WANDB_DIR=/mnt/zoe/home/.wandb
 export WANDB_ENTITY="${WANDB_ENTITY:-nightingale-314-}"
-export WANDB_PROJECT="${WANDB_PROJECT:-qam-reproduce}"
+export WANDB_PROJECT="${WANDB_PROJECT:-qam-stage3b}"
 export PYTHONPATH="$ROOT${PYTHONPATH:+:$PYTHONPATH}"
+# Human-readable W&B name, e.g. c2t4-late_b1-s10001-full
+WANDB_NAME="c2t4-${MASK}-s${SEED}-${MODE}"
+export WANDB_NAME
 
 cd "$ROOT"
 
@@ -47,9 +50,11 @@ COMMON=(
   --agent.am_mask_name="$MASK"
   --agent.am_budget_normalize=False
   --seed="$SEED"
+  --wandb_project="$WANDB_PROJECT"
+  --wandb_run_name="$WANDB_NAME"
 )
 
-echo "[$(date -Is)] STAGE3B GPU=$GPU mask=$MASK seed=$SEED mode=$MODE env=c2-task4 inv_temp=1 entity=$WANDB_ENTITY" | tee -a "$LOG"
+echo "[$(date -Is)] STAGE3B GPU=$GPU mask=$MASK seed=$SEED mode=$MODE env=c2-task4 inv_temp=1 entity=$WANDB_ENTITY project=$WANDB_PROJECT name=$WANDB_NAME" | tee -a "$LOG"
 
 ALLOWED_SEEDS="${STAGE3_SEEDS:-10001}"
 seed_ok=0
@@ -66,8 +71,8 @@ fi
 
 if [ "$MODE" = "smoke" ]; then
   bash "$ROOT/scripts/run_on_idle_gpu.sh" "${COMMON[@]}" \
-    --run_group=stage3b-floor-boost-smoke \
-    --tags="STAGE3B,${MASK},smoke,cube-double-task4" \
+    --run_group=smoke \
+    --tags="STAGE3B,${MASK},smoke,cube-double-task4,c2t4" \
     --offline_steps=200 \
     --online_steps=0 \
     --eval_interval=200 \
@@ -86,8 +91,8 @@ if [ "$MODE" != "full" ]; then
 fi
 
 bash "$ROOT/scripts/run_on_idle_gpu.sh" "${COMMON[@]}" \
-  --run_group=stage3b-floor-boost \
-  --tags="STAGE3B,${MASK},cube-double-task4,screening" \
+  --run_group=full \
+  --tags="STAGE3B,${MASK},full,cube-double-task4,c2t4" \
   --offline_steps=1000000 \
   --online_steps=500000 \
   --eval_interval=50000 \

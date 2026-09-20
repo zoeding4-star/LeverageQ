@@ -25,6 +25,16 @@ FLAGS = flags.FLAGS
 
 flags.DEFINE_string('run_group', 'Debug', 'Run group.')
 flags.DEFINE_string('tags', 'Default', 'Wandb tag.')
+flags.DEFINE_string(
+    'wandb_project',
+    '',
+    'W&B project. Empty uses WANDB_PROJECT or qam-reproduce.',
+)
+flags.DEFINE_string(
+    'wandb_run_name',
+    '',
+    'W&B / save-dir run name. Empty uses a flag hash (legacy).',
+)
 flags.DEFINE_integer('seed', 0, 'Random seed.')
 flags.DEFINE_string('env_name', 'cube-triple-play-singletask-task2-v0', 'Environment (dataset) name.')
 flags.DEFINE_string('save_dir', 'exp/', 'Save directory.')
@@ -128,8 +138,27 @@ def maybe_log_diagnostics(agent, batch, step, save_dir, logger, seed):
 
 def main(_):
     exp_name = get_exp_name(FLAGS)
-    run = setup_wandb(project='qam-reproduce', group=FLAGS.run_group, name=exp_name, tags=FLAGS.tags.split(","))
-    FLAGS.save_dir = os.path.join(FLAGS.save_dir, wandb.run.project, FLAGS.run_group, FLAGS.env_name, exp_name)
+    wandb_project = (
+        (FLAGS.wandb_project or "").strip()
+        or os.environ.get("WANDB_PROJECT")
+        or "qam-reproduce"
+    )
+    wandb_name = (
+        (FLAGS.wandb_run_name or "").strip()
+        or os.environ.get("WANDB_NAME")
+        or exp_name
+    )
+    job_type = FLAGS.run_group if FLAGS.run_group in ("smoke", "full") else None
+    run = setup_wandb(
+        project=wandb_project,
+        group=FLAGS.run_group,
+        name=wandb_name,
+        tags=[t for t in FLAGS.tags.split(",") if t],
+        job_type=job_type,
+    )
+    FLAGS.save_dir = os.path.join(
+        FLAGS.save_dir, wandb.run.project, FLAGS.run_group, FLAGS.env_name, wandb_name
+    )
     
     # data loading
     if FLAGS.ogbench_dataset_dir is not None:

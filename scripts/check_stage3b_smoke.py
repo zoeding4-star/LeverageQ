@@ -18,7 +18,7 @@ from stage3.am_weights import STAGE3B_ROUND, compute_am_weights, describe_am_mas
 
 SMOKE_GLOB = os.path.join(
     ROOT,
-    "exp/qam-reproduce/stage3b-floor-boost-smoke/**/offline_agent.csv",
+    "exp/qam-stage3b/smoke/**/offline_agent.csv",
 )
 
 
