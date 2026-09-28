@@ -102,15 +102,14 @@ class LoggingHelper:
             self.wandb_logger.log(payload, step=step)
 
 
-# MuJoCo dumps these as vectors; W&B then draws them as area/heatmap blocks.
-_WANDB_SKIP_SUBSTR = (
-    "qpos",
-    "qvel",
-    "control",
-    "button_states",
-    "prev_qpos",
-    "prev_qvel",
-)
+# W&B groups every eval/* key into one Area panel. Mixing success (0-1)
+# with total.timesteps (~1e4) and episode.return (~-1000) looks like a
+# color block even after dropping qpos/qvel vectors.
+_EVAL_WANDB_ALLOW = {
+    "success",
+    "episode.return",
+    "episode.final_reward",
+}
 
 
 def _as_finite_scalar(value):
@@ -129,11 +128,12 @@ def _as_finite_scalar(value):
 
 
 def _wandb_scalar_payload(data, prefix):
-    """Keep W&B charts as 1-D scalars. Skip MuJoCo state vectors."""
+    """W&B only. CSV still keeps the full row."""
+    if prefix == "env":
+        return {}
     out = {}
     for key, value in data.items():
-        lowered = str(key).lower()
-        if any(token in lowered for token in _WANDB_SKIP_SUBSTR):
+        if prefix == "eval" and key not in _EVAL_WANDB_ALLOW:
             continue
         number = _as_finite_scalar(value)
         if number is None:

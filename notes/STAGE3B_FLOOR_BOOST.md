@@ -5,7 +5,7 @@
 **不改** `agents/qam.py` / `main.py`。旧 Stage 3 结果和脚本保留。  
 W&B：独立项目 [`qam-stage3b`](https://wandb.ai/nightingale-314-/qam-stage3b)（不和以前的 `qam-reproduce` 混在一起）。  
 group：`smoke` / `full` 分开排。  
-W&B 只上传标量。`eval/qpos`、`qvel`、`control` 这类向量不再打上去，否则会被画成色块；看 `eval/success`、`eval/episode.return`。
+W&B 的 eval 只上传 `success`、`episode.return`、`episode.final_reward`。默认 Area 图会把 `total.timesteps`（上万）和 success（0–1）叠在一起变成色块；本地 `eval.csv` 仍保留全部列。
 
 ## 为什么换任务 / 为什么用这篇论文的配置
 
