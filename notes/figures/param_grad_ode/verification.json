@@ -1,0 +1,36 @@
+{
+  "adjoint_reproduction": {
+    "cosine": 0.9887523651123047,
+    "relative_l2": 0.1159927248954773,
+    "relative_rmse": 0.12036645412445068
+  },
+  "config": {
+    "flow_steps": 10,
+    "low_pass_samples": 16,
+    "low_pass_sigma": 0.12,
+    "seed": 7,
+    "test_samples": 512,
+    "train_samples": 2048,
+    "train_steps": 2500
+  },
+  "final_normalized_train_loss": 0.014515857212245464,
+  "sensitivity_to_high_frequency_terminal_error": {
+    "filtered_error_over_raw": 0.18429498513307435,
+    "filtered_full_adjoint": {
+      "cosine": 0.989223062992096,
+      "relative_l2": 0.1096581369638443,
+      "relative_rmse": 0.11649142950773239
+    },
+    "parameterized_error_over_raw": 0.05085641238245359,
+    "parameterized_filtered_adjoint": {
+      "cosine": 0.9994489550590515,
+      "relative_l2": 0.03312767297029495,
+      "relative_rmse": 0.032145943492650986
+    },
+    "raw_full_adjoint": {
+      "cosine": 0.7972526550292969,
+      "relative_l2": 0.7126098275184631,
+      "relative_rmse": 0.6320922374725342
+    }
+  }
+}
